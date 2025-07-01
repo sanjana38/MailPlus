@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+ <html lang="en">
+ <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MailPlus-Automate and Personalize</title>
+  <style>
+  body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  display: flex;
+  height: 100vh;
+  }
+  .sidebar {
+  width: 280px;
+  background: #f4f4f4;
+  padding: 20px;
+  border-right: 2px solid #ddd;
+  overflow-y: auto;
+  }
+  .preview {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background-color: #f9f9f9;
+  }
+  input, textarea, select {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 8px;
+  box-sizing: border-box;
+  }
+  button {
+  padding: 10px;
+  background: #3498db;
+  color: white;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  }
+  button:hover {
+  background: #2980b9;
+  }
+  .email-container {
+  max-width: 600px;
+  margin: 0 auto;
+  background: #ffffff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  padding: 30px;
+  }
+  .email-header {
+  background-color: #1e3a8a;
+  color: white;
+  text-align: center;
+  padding: 30px 20px;
+  }
+  .email-body h2 {
+  color: #1e3a8a;
+  margin-bottom: 10px;
+  }
+  .email-body p {
+  line-height: 1.6;
+  color: #333;
+  }
+  .email-button {
+  display: inline-block;
+  background-color: #28a745;
+  color: white;
+  padding: 12px 24px;
+  text-decoration: none;
+  border-radius: 6px;
+  margin-top: 20px;
+  font-weight: bold;
+  }
+  .email-footer {
+  margin-top: 30px;
+  font-size: 14px;
+  color: #777;
+  text-align: center;
+  }
+  .error {
+  color: red;
+  font-weight: bold;
+  }
+  </style>
+ </head>
+ <body>
+  <div class="sidebar">
+  <h3>✉️ MailPlus-Automate and Personalize</h3>
+  <label for="templateSelect">Choose Template:</label>
+  <select id="templateSelect">
+  <option value="welcome">Welcome</option>
+  <option value="internship">Internship Opportunity</option>
+  <option value="confirmation">Confirmation</option>
+  <option value="agenda">Agenda</option>
+  </select>
+  <input id="companyName" placeholder="Company Name" />
+  <input id="recipientName" placeholder="Recipient Name" />
+  <textarea id="customMessage" rows="4" placeholder="Message..."></textarea>
+  <label for="emailList">Upload Recipients File (.xlsx/.csv):</label>
+  <input type="file" id="emailList" accept=".xlsx,.csv" />
+  <button type="button" onclick="uploadRecipientsFile()">Upload List</button>
+  <input id="buttonText" placeholder="Button Text" />
+  <input id="buttonLink" placeholder="Button Link (URL)" />
+  <label for="emailAttachment">Attachments:</label>
+  <input id="emailAttachment" type="file" multiple />
+  <div id="fileList"></div>
+  <input id="yourName" placeholder="Your Name" />
+  <hr />
+  <input id="emailTo" placeholder="Recipient Email" />
+  <input id="emailSubject" placeholder="Subject" />
+  <input id="scheduleTime" type="datetime-local" />
+  <button onclick="sendEmail()">Send Email</button>
+  <button onclick="sendBulkEmail()">Send Bulk Email</button>
+  </div>
+
+  <div class="preview" id="emailPreview"></div>
+
+  <script>
+  const templates = {}; // Store loaded templates
+  const preview = document.getElementById('emailPreview');
+  const inputs = {
+  templateSelect: document.getElementById('templateSelect'),
+  companyName: document.getElementById('companyName'),
+  recipientName: document.getElementById('recipientName'),
+  customMessage: document.getElementById('customMessage'),
+  buttonText: document.getElementById('buttonText'),
+  buttonLink: document.getElementById('buttonLink'),
+  yourName: document.getElementById('yourName'),
+  emailSubject: document.getElementById('emailSubject')
+  };
+  const DEFAULT_MESSAGES = {
+  welcome: `We're thrilled to have you onboard! You’re now officially part of a team that's passionate, innovative, and collaborative. 
+ We're excited to see all the great things you'll accomplish here. To get started, check out your onboarding portal where you’ll find important resources, 
+ team intros, and next steps.If you have any questions, feel free to reach out to your manager or the HR team. Once again, welcome aboard!`,
+  internship: ` We’re super excited to share that [Company Name] is on the lookout for new interns to join our squad! 🙌 If you're passionate about Design and ready to dive into some cool projects, this is the perfect opportunity for you. ✨
+Here’s the 411:
+Duration: [6 months] (Just long enough to learn a TON!)
+Location: Remote 🌍
+Ready to level up? 🎮 Hit the link below and apply ASAP: [Application Link]
+Have any questions? Slide into our DMs at [Contact Email] or drop us an email. We can’t wait to meet you! 🤩
+
+Catch you soon,`,
+  confirmation: `We are delighted to formally confirm our offer of employment for the position of manager. We were very impressed with your qualifications and believe you will be a valuable asset to our team.
+ We are pleased to offer you with the benefits outlined in the attached document or as previously discussed. You'll be starting from nextweek.
+ We are excited about the prospect of you joining our company and look forward to welcoming you to the team. 
+ Welcome aboard!`,
+ 
+  agenda: `Agenda Items
+You're invited to our upcoming event TechnoHUB - Where Creativity Meets Innovation. Here's the agenda for the day:
+Opening Remarks
+Welcome and introductions by John Smith
+Please come prepared to discuss the agenda items. If you have any additional points you'd like to bring up, kindly let us know beforehand.
+`
+  };
+
+
+  async function loadTemplate(templateName) {
+  try {
+  const response = await fetch(`${templateName}Template.html`);
+  if (!response.ok) {
+  console.error(`Failed to load template ${templateName}: ${response.status}`);
+  templates[templateName] = `<p class="error">Failed to load template: ${response.statusText}</p>`;
+  updatePreview();
+  return;
+  }
+  const templateHtml = await response.text();
+  templates[templateName] = templateHtml;
+
+  // Only pre-fill the message if it's empty (user hasn't typed anything)
+  if (!inputs.customMessage.value.trim()) {
+  inputs.customMessage.value = DEFAULT_MESSAGES[templateName] || "";
+  }
+
+  updatePreview();
+
+  } catch (error) {
+  console.error(`Error loading template ${templateName}:`, error);
+  templates[templateName] = `<p class="error">Error loading template.</p>`;
+  updatePreview();
+  }
+  }
+// Load the initial template (Welcome)
+loadTemplate(inputs.templateSelect.value);
+
+  inputs.templateSelect.addEventListener('change', () => {
+  const selected = inputs.templateSelect.value;
+  if (DEFAULT_MESSAGES[selected]) {
+  inputs.customMessage.value = DEFAULT_MESSAGES[selected]; // Fill message box
+  updatePreview(); // Optional: update live preview
+  }
+  });
+
+  function updatePreview() {
+  const selectedTemplate = inputs.templateSelect.value;
+  const templateHtml = templates[selectedTemplate];
+
+  if (templateHtml) {
+  const company = escapeHtml(inputs.companyName.value || "Your Company");
+  const name = escapeHtml(inputs.recipientName.value || "{{name}}");
+  const customMessage = inputs.customMessage.value || "Thank you for being with us.";
+  const btnText = escapeHtml(inputs.buttonText.value || "Learn More");
+  const btnLink = escapeHtml(inputs.buttonLink.value || "#");
+  const yourName = escapeHtml(inputs.yourName.value || "Team");
+
+  let html = templateHtml
+  .replace(/{{company}}/g, company)
+  .replace(/{{name}}/g, name)
+  .replace(/{{message}}/g, customMessage)
+  .replace(/{{btnText}}/g, btnText)
+  .replace(/{{btnLink}}/g, btnLink)
+  .replace(/{{yourName}}/g, yourName);
+
+ 
+
+  preview.innerHTML = `<div class="email-container">${html}</div>`;
+  inputs.emailSubject.value = `${selectedTemplate[0].toUpperCase() + selectedTemplate.slice(1)} from ${company}`;
+  } else {
+  preview.innerHTML = '<p>Select a template to preview.</p>';
+  }
+  }
+
+  function uploadRecipientsFile(event) {
+    event?.preventDefault();
+  
+
+  const fileInput = document.getElementById('emailList');
+  const file = fileInput.files[0];
+
+  if (!file) {
+    alert('Please select a file');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('recipientsFile', file);
+
+  fetch('http://localhost:3000/upload-recipients', {
+    method: 'POST',
+    body: formData
+  })
+    .then(res => res.json())
+    .then(result => {
+      if (result.success) {
+        console.log('✅ File uploaded and processed!');
+      } else {
+        alert('❌ Upload failed: ' + result.error);
+      }
+    })
+    .catch(error => {
+      console.error( 'Error uploading file:', error);
+    });
+}
+
+  function escapeHtml(unsafe) {
+  return unsafe
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#039;")
+  }
+
+  Object.values(inputs).forEach(input => {
+  input.addEventListener('input', updatePreview);
+  });
+
+  inputs.templateSelect.addEventListener('change', () => {
+  const selectedTemplate = inputs.templateSelect.value;
+  loadTemplate(selectedTemplate);
+  });
+
+  async function sendEmail() {
+  const fileInput = document.getElementById('emailAttachment');
+  const files = Array.from(fileInput.files);
+  const attachments = await Promise.all(files.map(async (file) => {
+  const reader = new FileReader();
+  return new Promise((resolve) => {
+  reader.onloadend = () => {
+  resolve({
+  filename: file.name,
+  content: reader.result.split(',')[1],
+  encoding: 'base64',
+  });
+  };
+  reader.readAsDataURL(file);
+  });
+  }));
+
+  const to = document.getElementById('emailTo').value;
+  const subject = document.getElementById('emailSubject').value;
+  const html = preview.innerHTML;
+  const scheduleTime = document.getElementById('scheduleTime').value;
+
+  const response = await fetch('http://localhost:3000/send', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ to, subject, html, attachments, scheduleTime }),
+  });
+
+  const result = await response.json();
+  alert(result.success ? '✅ Email sent!' : '❌ Failed to send: ' + result.error);
+  }
+  console.log('Personalized HTML:', personalizedHtml);
+
+  async function sendBulkEmail() {
+  const subjectInput = document.getElementById('emailSubject');
+  const bodyHtml = document.getElementById('emailPreview').innerHTML; // Get the HTML from the preview
+  const fileInput = document.getElementById('emailAttachment');
+  const files = Array.from(fileInput.files);
+  const attachments = await Promise.all(files.map(async (file) => {
+  const reader = new FileReader();
+  return new Promise((resolve) => {
+  reader.onloadend = () => {
+  resolve({
+  filename: file.name,
+  content: reader.result.split(',')[1],
+  encoding: 'base64',
+  });
+  };
+  reader.readAsDataURL(file);
+  });
+  }));
+
+  const payload = {
+  subject: subjectInput.value,
+  html: bodyHtml,
+  attachments: attachments
+  };
+
+  try {
+  const response = await fetch('http://localhost:3000/send-bulk', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload)
+  });
+
+  const result = await response.json();
+  if (result.success) {
+  alert(`✅ Bulk email sent to ${result.count} recipients.`);
+  } else {
+  alert('❌ Bulk email failed: ' + result.error);
+  }
+  } catch (error) {
+  console.error('Frontend bulk send error:', error);
+  alert('❌ Failed to send bulk email.');
+  }
+ }
+
+  // Load the initial template (Welcome)
+  loadTemplate(inputs.templateSelect.value);  
+  </script>
+ </body>
+ </html>

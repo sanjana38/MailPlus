@@ -1,4 +1,4 @@
-# 📧 MailPlus: Automate and Personalize Email Campaigns
+# 📧 MailPlus: Automate and Personalize 
 
 MailPlus is a Node.js application that lets you:
 
